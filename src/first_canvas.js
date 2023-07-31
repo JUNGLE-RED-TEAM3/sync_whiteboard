@@ -8,19 +8,11 @@ export function Canvas() {
     startDrawing,
     finishDrawing,
     draw,
-    socketRef,  // NOTE: socket.io code
   } = useCanvas();
 
   useEffect(() => {
     prepareCanvas();
-
-    // 이벤트 리스너 추가
-    if (socketRef.current) {
-      socketRef.current.on('drawing', (data) => {
-          console.log(data);
-      });
-    }
-  }, [socketRef]);  // NOTE: socketRef를 dependency로 추가
+  }, []);
 
   return (
     <canvas
