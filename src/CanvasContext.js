@@ -7,13 +7,21 @@ export const CanvasProvider = ({ children }) => {
   const [isDrawing, setIsDrawing] = useState(false)
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
-  const socketRef = useRef(null);  // socketRef 추가
+  const socketRef = useRef(null);  
+
+  const [lineWidth, setLineWidth] = useState(5);  
+  const [strokeColor, setStrokeColor] = useState('black');  
+
+
+  //서버 연결부분
 
   useEffect(() => {
     socketRef.current = io.connect('http://localhost:4001');
   
     socketRef.current.on('startDrawing', data => {  // Listen for 'startDrawing' events
-      const { offsetX, offsetY } = data;
+      const { offsetX, offsetY, lineWidth, strokeColor } = data;
+      contextRef.current.strokeStyle = strokeColor;  // Update stroke color
+      contextRef.current.lineWidth = lineWidth;  // Update line width
       contextRef.current.beginPath();
       contextRef.current.moveTo(offsetX, offsetY);
     });
@@ -37,6 +45,9 @@ export const CanvasProvider = ({ children }) => {
     });
   }, []);
 
+
+
+  // 캔버스 준비
   const prepareCanvas = () => {
     const canvas = canvasRef.current
     canvas.width = window.innerWidth * 2;
@@ -48,38 +59,40 @@ export const CanvasProvider = ({ children }) => {
     const context = canvas.getContext("2d")
     context.scale(1.42, 1.42);
     context.lineCap = "round";
-    context.strokeStyle = "black";
-    context.lineWidth = 5;
+    context.strokeStyle = strokeColor;  
+    context.lineWidth = lineWidth;  
     contextRef.current = context;
   };
 
+  // 마우스 다운시 실행되는 함수
   const startDrawing = ({ nativeEvent }) => {
     const { clientX, clientY } = nativeEvent;
     const canvas = canvasRef.current;
     const canvasRect = canvas.getBoundingClientRect();
-    const offsetX = (clientX - canvasRect.left) * 2;  // 곱하기 2를 추가
-    const offsetY = (clientY - canvasRect.top) * 2;  // 곱하기 2를 추가
+    const offsetX = (clientX - canvasRect.left) * 2;  
+    const offsetY = (clientY - canvasRect.top) * 2;  
     contextRef.current.beginPath();
-    contextRef.current.moveTo(offsetX, offsetY);
+    contextRef.current.moveTo(offsetX, offsetY, lineWidth, strokeColor);
     setIsDrawing(true);
   
-    // NOTE: socket.io code
+    
     if (socketRef.current) {
-      socketRef.current.emit('startDrawing', { offsetX, offsetY });  // Emit 'startDrawing' event
+      socketRef.current.emit('startDrawing', { offsetX, offsetY, lineWidth, strokeColor });  // Emit 'startDrawing' event
     }
-    // NOTE: socket.io code
+    
   };
 
+  //마우스 업시 실행되는 함수
   const finishDrawing = () => {
     contextRef.current.closePath();
     setIsDrawing(false);
     
-    // Send 'endDrawing' event to the server
     if (socketRef.current) {
     socketRef.current.emit('endDrawing');
     }
   };
 
+  // 마우스 드래그시 실행되는 함수
   const draw = ({ nativeEvent }) => {
     if (!isDrawing) {
         return;
@@ -87,24 +100,57 @@ export const CanvasProvider = ({ children }) => {
     const { clientX, clientY } = nativeEvent;
     const canvas = canvasRef.current;
     const canvasRect = canvas.getBoundingClientRect();
-    const offsetX = (clientX - canvasRect.left) * 2;  // 곱하기 2를 추가
-    const offsetY = (clientY - canvasRect.top) * 2;  // 곱하기 2를 추가
+    const offsetX = (clientX - canvasRect.left) * 2;  
+    const offsetY = (clientY - canvasRect.top) * 2;  
     contextRef.current.lineTo(offsetX, offsetY);
     contextRef.current.stroke();
-    // NOTE: socket.io code
+  
     if (socketRef.current) {
       socketRef.current.emit('drawing', { offsetX, offsetY });
     }
-    // NOTE: socket.io code
+    
   };
 
+  // 도형을 그리는 함수들 //JUNHO: 일단 도형 그리는 코드는 복잡성 증가때문에 보류
+  // const drawCircle = ({ nativeEvent }) => {
+  //   const { clientX, clientY } = nativeEvent;
+  //   const canvas = canvasRef.current;
+  //   const context = canvas.getContext("2d");
+  //   const radius = 50;  // Set the radius of the circle
+  //   context.arc(clientX, clientY, radius, 0, 2 * Math.PI);
+  //   context.stroke();
+  // };
+
+  // const drawSquare = ({ nativeEvent }) => {
+  //   const { clientX, clientY } = nativeEvent;
+  //   const canvas = canvasRef.current;
+  //   const context = canvas.getContext("2d");
+  //   const sideLength = 100;  // Set the length of the square's sides
+  //   context.rect(clientX - sideLength / 2, clientY - sideLength / 2, sideLength, sideLength);
+  //   context.stroke();
+  // };
+
+  // const drawTriangle = ({ nativeEvent }) => {
+  //   const { clientX, clientY } = nativeEvent;
+  //   const canvas = canvasRef.current;
+  //   const context = canvas.getContext("2d");
+  //   const sideLength = 100;  // Set the length of the triangle's sides
+  //   context.moveTo(clientX, clientY - sideLength / 2);
+  //   context.lineTo(clientX - sideLength / 2, clientY + sideLength / 2);
+  //   context.lineTo(clientX + sideLength / 2, clientY + sideLength / 2);
+  //   context.closePath();
+  //   context.stroke();
+  // };
+
+  
+  // 캔버스 초기화 버튼 관련 함수
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d")
     context.fillStyle = "white"
     context.fillRect(0, 0, canvas.width, canvas.height)
   
-    // Emit 'clearCanvas' event
+    
     if (socketRef.current) {
       socketRef.current.emit('clearCanvas');
     }
@@ -116,6 +162,13 @@ export const CanvasProvider = ({ children }) => {
         canvasRef,
         contextRef,
         socketRef,  // socketRef를 값에 추가
+        lineWidth, 
+        strokeColor,  
+        // drawCircle, //JUNHO: 일단 도형 그리는 코드는 복잡성 증가때문에 보류
+        // drawSquare,
+        // drawTriangle,
+        setStrokeColor,  
+        setLineWidth,  
         prepareCanvas,
         startDrawing,
         finishDrawing,
